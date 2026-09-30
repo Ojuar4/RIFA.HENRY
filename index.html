@@ -65,6 +65,7 @@ Chave Pix para pagamento: <b>gbaraujo45@icloud.com</b>
 <div class="footer-bar">
 <span><b id="selCount">0</b> número(s) · <b id="selTotal">R$ 0,00</b></span>
 <input id="buyerName" placeholder="Seu nome">
+<input id="buyerPhone" placeholder="Seu WhatsApp (com DDD)">
 <button id="reservarBtn" disabled>Reservar</button>
 </div>
 <script>
@@ -72,7 +73,7 @@ Chave Pix para pagamento: <b>gbaraujo45@icloud.com</b>
 // COLE AQUI a URL do seu Apps Script (termina em /exec), depois
 // de publicar o Google Sheets como banco de dados (veja instruções).
 // ==========================================================
-var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlwB29UVnb_uD_Pewqa7fBOErjefgSHdKDzefXLfkASAu9AofXf4CmTrlEDRf8fmTW/exec";
+var APPS_SCRIPT_URL = "COLE_AQUI_A_URL_DO_APPS_SCRIPT";
 
 var WHATSAPP = "31998360024";
 var PIX = "gbaraujo45@icloud.com";
@@ -160,7 +161,9 @@ function openWhats(chosen, name){
 
 function reservar(){
   var name = document.getElementById("buyerName").value.trim();
+  var phone = document.getElementById("buyerPhone").value.trim();
   if (!name){ alert("Digite seu nome antes de reservar."); return; }
+  if (!phone){ alert("Digite seu WhatsApp antes de reservar."); return; }
   if (selected.size === 0){ return; }
   if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.indexOf("COLE_AQUI") !== -1){
     alert("A rifa ainda não está totalmente configurada. Avise o organizador.");
@@ -174,7 +177,7 @@ function reservar(){
   fetch(APPS_SCRIPT_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ numeros: chosen, nome: name })
+    body: JSON.stringify({ numeros: chosen, nome: name, telefone: phone })
   })
     .then(function(res){ return res.json(); })
     .then(function(data){
@@ -182,6 +185,7 @@ function reservar(){
       if (data.ok){
         selected.clear();
         document.getElementById("buyerName").value = "";
+        document.getElementById("buyerPhone").value = "";
         loadState();
         openWhats(chosenLabels, name);
         showToast("Reserva feita! Confirme o pagamento pelo WhatsApp.");
