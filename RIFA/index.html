@@ -1,0 +1,213 @@
+!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rifa do Henry 🦁</title>
+<style>
+:root{
+  --bg:#EAF2F8; --card:#FFFFFF; --savana:#4A90C4; --leaf:#1F4E79; --brown:#2C3E63;
+  --taken:#B9C7D6; --text:#1B2A41; --accent:#1F6FB2;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#0F1A24; --card:#16232F; --text:#DCE6F0; --taken:#2B3A48; } }
+:root[data-theme="dark"]{ --bg:#0F1A24; --card:#16232F; --text:#DCE6F0; --taken:#2B3A48; }
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Georgia,'Times New Roman',serif;padding-bottom:110px;}
+.wrap{max-width:820px;margin:0 auto;padding:20px 14px 40px;}
+header{text-align:center;padding:18px 10px;background:linear-gradient(180deg,var(--leaf),var(--savana));border-radius:16px;color:#eaf4fc;margin-bottom:16px;}
+header h1{margin:0 0 4px;font-size:1.6em;}
+header p{margin:2px 0;font-size:.95em;}
+.info{background:var(--card);border:2px dashed var(--savana);border-radius:14px;padding:12px 16px;margin-bottom:14px;font-size:.95em;line-height:1.5;}
+.info b{color:var(--accent);}
+.status-line{font-size:.8em;color:var(--brown);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+.status-line button{background:none;border:1px solid var(--savana);border-radius:8px;padding:4px 10px;cursor:pointer;color:var(--brown);font-size:.95em;}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.82em;margin-bottom:10px;}
+.legend span{display:inline-flex;align-items:center;gap:5px;}
+.dot{width:12px;height:12px;border-radius:4px;display:inline-block;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:7px;}
+.cell{padding:10px 0;border-radius:8px;border:2px solid var(--savana);background:var(--card);color:var(--text);font-weight:bold;cursor:pointer;font-size:.9em;}
+.cell.sel{background:var(--leaf);color:#fff;border-color:var(--leaf);}
+.cell.taken{background:var(--taken);color:#4a5a6b;border-color:var(--taken);cursor:not-allowed;}
+.footer-bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:2px solid var(--savana);padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;}
+.footer-bar input{flex:1;min-width:120px;padding:9px;border-radius:8px;border:1px solid #b9c7d6;font-family:inherit;}
+.footer-bar b{white-space:nowrap;}
+.footer-bar button{background:var(--leaf);color:#fff;border:none;padding:10px 16px;border-radius:8px;font-weight:bold;cursor:pointer;}
+.footer-bar button:disabled{opacity:.5;cursor:not-allowed;}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--brown);color:#fff;padding:8px 14px;border-radius:20px;font-size:.85em;z-index:99;max-width:90%;text-align:center;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<h1>🦁 Rifa do Henry 🐘</h1>
+<p>Henry Nogueira Araújo está chegando! Ajude a receber o Henry com carinho.</p>
+<p>Sorteio: 20 de dezembro de 2026</p>
+</header>
+<div class="info">
+Prêmio: uma linda Cesta Natalina! 🎁 · Cada número custa <b>R$ 5,00</b> · 200 números disponíveis.<br>
+Escolha os seus abaixo, digite seu nome e clique em Reservar.<br>
+Chave Pix para pagamento: <b>gbaraujo45@icloud.com</b>
+</div>
+<div class="status-line">
+<span id="statusText">Carregando números...</span>
+<button id="refreshBtn" type="button">🔄 Atualizar</button>
+</div>
+<div class="legend">
+<span><i class="dot" style="background:var(--card);border:2px solid var(--savana);"></i>Disponível</span>
+<span><i class="dot" style="background:var(--leaf);"></i>Selecionado</span>
+<span><i class="dot" style="background:var(--taken);"></i>Reservado</span>
+</div>
+<div class="grid" id="grid"></div>
+</div>
+<div class="footer-bar">
+<span><b id="selCount">0</b> número(s) · <b id="selTotal">R$ 0,00</b></span>
+<input id="buyerName" placeholder="Seu nome">
+<button id="reservarBtn" disabled>Reservar</button>
+</div>
+<script>
+// ==========================================================
+// COLE AQUI a URL do seu Apps Script (termina em /exec), depois
+// de publicar o Google Sheets como banco de dados (veja instruções).
+// ==========================================================
+var APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxlwB29UVnb_uD_Pewqa7fBOErjefgSHdKDzefXLfkASAu9AofXf4CmTrlEDRf8fmTW/exec";
+
+var WHATSAPP = "31998360024";
+var PIX = "gbaraujo45@icloud.com";
+
+var numbersState = new Array(200).fill(null); // null = livre, ou {name}
+var selected = new Set();
+
+function pad3(n){ return String(n).padStart(3, "0"); }
+function money(n){ return "R$ " + (n * 5).toFixed(2).replace(".", ","); }
+function esc(s){ return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+function cellHtml(i){
+  var num = pad3(i + 1);
+  var taken = numbersState[i];
+  var cls = taken ? "cell taken" : (selected.has(i) ? "cell sel" : "cell");
+  var title = taken ? (' title="Reservado por ' + esc(taken.name) + '"') : "";
+  return '<button type="button" class="' + cls + '" data-idx="' + i + '"' + title + ">" + num + "</button>";
+}
+
+function renderGrid(){
+  var out = "";
+  for (var i = 0; i < 200; i++){ out += cellHtml(i); }
+  document.getElementById("grid").innerHTML = out;
+}
+
+function updateFooter(){
+  var n = selected.size;
+  document.getElementById("selCount").textContent = n;
+  document.getElementById("selTotal").textContent = money(n);
+  document.getElementById("reservarBtn").disabled = (n === 0);
+}
+
+function renderAll(){ renderGrid(); updateFooter(); }
+
+function onGridClick(e){
+  var btn = e.target.closest(".cell");
+  if (!btn || btn.classList.contains("taken")) return;
+  var idx = parseInt(btn.dataset.idx, 10);
+  if (selected.has(idx)) { selected.delete(idx); } else { selected.add(idx); }
+  renderAll();
+}
+
+function showToast(msg){
+  var t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(function(){ t.remove(); }, 4500);
+}
+
+function setStatus(msg){ document.getElementById("statusText").textContent = msg; }
+
+function applyReservas(reservas){
+  numbersState = new Array(200).fill(null);
+  (reservas || []).forEach(function(r){
+    var idx = Number(r.numero) - 1;
+    if (idx >= 0 && idx < 200){ numbersState[idx] = { name: r.nome }; }
+  });
+}
+
+function loadState(){
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.indexOf("COLE_AQUI") !== -1){
+    setStatus("⚠️ Configuração pendente: cole a URL do Apps Script no código.");
+    return;
+  }
+  fetch(APPS_SCRIPT_URL)
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      applyReservas(data.reservas);
+      renderAll();
+      var restantes = 200 - (data.reservas || []).length;
+      setStatus(restantes + " número(s) ainda disponível(is).");
+    })
+    .catch(function(){
+      setStatus("Não foi possível atualizar agora. Tente de novo em instantes.");
+    });
+}
+
+function openWhats(chosen, name){
+  var wa = WHATSAPP.replace(/\D/g, "");
+  if (wa.length <= 11) { wa = "55" + wa; }
+  var msg = "Ola! Acabei de reservar os numeros da rifa do Henry: " + chosen.join(", ") + ". Total: " + money(chosen.length) + ". Meu nome: " + name + ". Vou fazer o pix para: " + PIX;
+  window.open("https://wa.me/" + wa + "?text=" + encodeURIComponent(msg), "_blank");
+}
+
+function reservar(){
+  var name = document.getElementById("buyerName").value.trim();
+  if (!name){ alert("Digite seu nome antes de reservar."); return; }
+  if (selected.size === 0){ return; }
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.indexOf("COLE_AQUI") !== -1){
+    alert("A rifa ainda não está totalmente configurada. Avise o organizador.");
+    return;
+  }
+  var chosen = Array.from(selected).map(function(i){ return i + 1; });
+  var chosenLabels = chosen.map(function(n){ return pad3(n); });
+  var btn = document.getElementById("reservarBtn");
+  btn.disabled = true;
+  btn.textContent = "Reservando...";
+  fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ numeros: chosen, nome: name })
+  })
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      btn.textContent = "Reservar";
+      if (data.ok){
+        selected.clear();
+        document.getElementById("buyerName").value = "";
+        loadState();
+        openWhats(chosenLabels, name);
+        showToast("Reserva feita! Confirme o pagamento pelo WhatsApp.");
+      } else if (data.error === "numeros_indisponiveis"){
+        alert("Alguém acabou de reservar antes de você o(s) número(s): " + (data.numeros || []).join(", ") + ". Atualizando a lista, escolha outro(s).");
+        selected.clear();
+        loadState();
+      } else {
+        alert("Não foi possível reservar agora. Tente novamente.");
+        updateFooter();
+      }
+    })
+    .catch(function(){
+      btn.textContent = "Reservar";
+      alert("Falha de conexão. Verifique sua internet e tente de novo.");
+      updateFooter();
+    });
+}
+
+document.getElementById("grid").addEventListener("click", onGridClick);
+document.getElementById("reservarBtn").addEventListener("click", reservar);
+document.getElementById("refreshBtn").addEventListener("click", loadState);
+
+renderAll();
+loadState();
+setInterval(loadState, 12000);
+</script>
+</body>
+</html>
